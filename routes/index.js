@@ -63,10 +63,6 @@ router.post('/login', function(req, res, next) {
   });
 });
 
-// =============================
-// Protected Route
-// =============================
-
 router.get('/protected', authenticateToken, function(req, res, next) {
   res.json({ message: 'This is a protected route', user: req.user });
 });
