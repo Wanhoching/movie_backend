@@ -161,13 +161,44 @@ router.post('/applications', function(req, res, next) {
 
 // Get all applications
 router.get('/applications', function(req, res, next) {
-  db.all(`SELECT * FROM Applications`, [], (err, rows) => {
+  const { name, status, page = 1, pageSize = 5 } = req.query;
+
+  let sql = `SELECT * FROM Applications WHERE 1=1`; 
+  const params = [];
+
+  if (name) {
+    sql += ` AND name LIKE ?`;
+    params.push(`%${name}%`);
+  }
+
+  if (status) {
+    sql += ` AND status = ?`;
+    params.push(status);
+  }
+
+  const countSql = `SELECT COUNT(*) as total FROM Applications WHERE 1=1`;
+  let totalParams = [...params];
+
+  db.get(countSql, totalParams, (err, countRow) => {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
-    res.json(rows);
+    const total = countRow.total;
+
+    sql += ` LIMIT ? OFFSET ?`;
+    params.push(parseInt(pageSize), (parseInt(page) - 1) * parseInt(pageSize));
+
+    db.all(sql, params, (err, rows) => {
+      if (err) {
+        return res.status(500).json({ error: err.message });
+      }
+      res.json({ data: rows, total });
+    });
   });
 });
+
+
+
 
 // Get a specific application by ID
 router.get('/applications/:id', function(req, res, next) {
