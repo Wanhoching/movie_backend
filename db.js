@@ -32,6 +32,21 @@ function createTables() {
         }
     });
 
+    db.run(`CREATE TABLE IF NOT EXISTS Messages (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  message TEXT NOT NULL,
+  admin_reply TEXT,
+     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY(user_id) REFERENCES Users(id)
+);
+`, (err) => {
+        if (err) {
+            console.error('Error creating Users table:', err.message);
+        } else {
+            console.log('Users table created or already exists.');
+        }
+    });
     // Videos table: stores video information, including name and description
     db.run(`CREATE TABLE IF NOT EXISTS Videos (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -48,8 +63,8 @@ function createTables() {
         }
     });
 
-   // Insert sample data only if the record does not already exist
-db.run(`
+    // Insert sample data only if the record does not already exist
+    db.run(`
     INSERT OR IGNORE INTO Videos (name, status, description, video) 
     VALUES
     ('Movie 1', 'new', 'Sample description 1', 'https://example.com/sample_video1.mp4'),
@@ -58,14 +73,14 @@ db.run(`
     ('Movie 4', 'new', 'Sample description 4', 'https://example.com/sample_video4.mp4'),
     ('Movie 5', 'new', 'Sample description 5', 'https://example.com/sample_video5.mp4');
 `, (err) => {
-    if (err) {
-        console.error('Error inserting into Videos table:', err.message);
-    } else {
-        console.log('Sample data inserted or ignored if already exists.');
-    }
-});
+        if (err) {
+            console.error('Error inserting into Videos table:', err.message);
+        } else {
+            console.log('Sample data inserted or ignored if already exists.');
+        }
+    });
 
-db.run(`CREATE TABLE IF NOT EXISTS Rentals (
+    db.run(`CREATE TABLE IF NOT EXISTS Rentals (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
     video_id INTEGER NOT NULL,
@@ -76,48 +91,13 @@ db.run(`CREATE TABLE IF NOT EXISTS Rentals (
     FOREIGN KEY (user_id) REFERENCES Users(id),
     FOREIGN KEY (video_id) REFERENCES Videos(id)
 )`, (err) => {
-    if (err) {
-        console.error('Error creating Rentals table:', err.message);
-    } else {
-        console.log('Rentals table created or already exists.');
-    }
-});
-   
-    db.run(`
-         CREATE TABLE IF NOT EXISTS Applications (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL, -- References the user who made the application
-        item TEXT NOT NULL, -- The item to be rented
-        status TEXT NOT NULL DEFAULT 'new', -- 'new', 'pending', 'accepted', 'rejected'
-        description TEXT NOT NULL, -- Description of the rental application
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP, -- Timestamp of when the application was created
-        FOREIGN KEY(user_id) REFERENCES Users(id) -- Link to the Users table
-        );
+        if (err) {
+            console.error('Error creating Rentals table:', err.message);
+        } else {
+            console.log('Rentals table created or already exists.');
+        }
+    });
 
-        `, (err) => {
-        if (err) {
-            console.error('Error creating Applications table:', err.message);
-        } else {
-            console.log('Applications table created or already exists.');
-        }
-    });
-    
-    // Messages table: stores messages exchanged between users and staff
-    db.run(`CREATE TABLE IF NOT EXISTS Messages (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        video_id INTEGER NOT NULL, -- Updated to reference Videos table
-        message TEXT NOT NULL,
-        sent_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY(user_id) REFERENCES Users(id),
-        FOREIGN KEY(video_id) REFERENCES Videos(id)
-    )`, (err) => {
-        if (err) {
-            console.error('Error creating Messages table:', err.message);
-        } else {
-            console.log('Messages table created or already exists.');
-        }
-    });
 }
 
 // Export the database object to be used in other modules

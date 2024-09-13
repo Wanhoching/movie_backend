@@ -177,8 +177,6 @@ router.get('/videos', function(req, res, next) {
     params.push(`%${name}%`);
     countParams.push(`%${name}%`);
   }
-
-  // 为 status 添加筛选条件
   if (status) {
     sql += ` AND status = ?`;
     countSql += ` AND status = ?`;
@@ -239,117 +237,6 @@ router.delete('/videos/:id', function(req, res, next) {
     res.status(204).end();
   });
 });
-
-
-// =============================
-// Messages CRUD operations
-// =============================
-
-// Create a new message
-router.post('/messages', function(req, res, next) {
-  const { user_id, video_id, message } = req.body; // Updated to reference video_id
-  const sql = `INSERT INTO Messages (user_id, video_id, message) VALUES (?, ?, ?)`;
-  db.run(sql, [user_id, video_id, message], function(err) {
-    if (err) {
-      return res.status(500).json({ error: err.message });
-    }
-    res.status(201).json({ messageId: this.lastID });
-  });
-});
-
-// Get all messages
-router.get('/messages', function(req, res, next) {
-  db.all(`SELECT * FROM Messages`, [], (err, rows) => {
-    if (err) {
-      return res.status(500).json({ error: err.message });
-    }
-    res.json(rows);
-  });
-});
-
-// Get a specific message by ID
-router.get('/messages/:id', function(req, res, next) {
-  const { id } = req.params;
-  db.get(`SELECT * FROM Messages WHERE id = ?`, [id], (err, row) => {
-    if (err) {
-      return res.status(500).json({ error: err.message });
-    }
-    res.json(row);
-  });
-});
-
-// Update a message by ID
-router.put('/messages/:id', function(req, res, next) {
-  const { id } = req.params;
-  const { message } = req.body;
-  const sql = `UPDATE Messages SET message = ? WHERE id = ?`;
-  db.run(sql, [message, id], function(err) {
-    if (err) {
-      return res.status(500).json({ error: err.message });
-    }
-    res.json({ changes: this.changes });
-  });
-});
-
-// Delete a message by ID
-router.delete('/messages/:id', function(req, res, next) {
-  const { id } = req.params;
-  db.run(`DELETE FROM Messages WHERE id = ?`, [id], function(err) {
-    if (err) {
-      return res.status(500).json({ error: err.message });
-    }
-    res.status(204).end();
-  });
-});
-
-
-router.post('/applications', authenticateToken, function(req, res, next) {
-  const { item, description } = req.body;
-  const userId = req.user.userId; 
-
-  const sql = `INSERT INTO Applications (user_id, item, description) VALUES (?, ?, ?)`;
-  db.run(sql, [userId, item, description], function(err) {
-    if (err) {
-      return res.status(500).json({ error: err.message });
-    }
-    res.status(201).json({ applicationId: this.lastID });
-  });
-});
-
-router.get('/applications', function(req, res, next) {
-  const sql = `SELECT * FROM Applications`;
-  db.all(sql, [], (err, rows) => {
-    if (err) {
-      return res.status(500).json({ error: err.message });
-    }
-    res.json(rows); // Returns all rental applications
-  });
-});
-
-router.put('/applications/:id/status', function(req, res, next) {
-  const { id } = req.params; // Application ID
-  const { status } = req.body; // New status: 'pending', 'accepted', 'rejected'
-
-  const sql = `UPDATE Applications SET status = ? WHERE id = ?`;
-  db.run(sql, [status, id], function(err) {
-    if (err) {
-      return res.status(500).json({ error: err.message });
-    }
-    res.json({ changes: this.changes });
-  });
-});
-
-router.get('/applications/:id', function(req, res, next) {
-  const { id } = req.params;
-  const sql = `SELECT * FROM Applications WHERE id = ?`;
-  db.get(sql, [id], (err, row) => {
-    if (err) {
-      return res.status(500).json({ error: err.message });
-    }
-    res.json(row);
-  });
-});
-
 
 // Create a new rental
 router.post('/rentals', authenticateToken, (req, res) => {
@@ -418,6 +305,89 @@ router.delete('/rentals/:id', authenticateToken, (req, res) => {
       return res.status(500).json({ error: err.message });
     }
     res.status(204).end();
+  });
+});
+
+
+router.get('/user/rentals', authenticateToken, (req, res) => {
+  const userId = req.user.userId; 
+
+  const sql = `SELECT Rentals.*, Videos.name AS video_name 
+               FROM Rentals 
+               JOIN Videos ON Rentals.video_id = Videos.id
+               WHERE Rentals.user_id = ?`;
+
+  db.all(sql, [userId], (err, rows) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    res.json(rows);
+  });
+});
+
+
+// 获取用户的所有消息
+router.get('/messages', authenticateToken, (req, res) => {
+  const userId = req.user.userId;
+
+  const sql = `SELECT * FROM Messages WHERE user_id = ? `;
+  db.all(sql, [userId], (err, rows) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    res.json(rows);
+  });
+});
+
+// 发送消息
+router.post('/messages', authenticateToken, (req, res) => {
+  const { message } = req.body;
+  const userId = req.user.userId;
+
+  if (!message) {
+    return res.status(400).json({ error: "Message cannot be empty" });
+  }
+
+  const sql = `INSERT INTO Messages (user_id, message) VALUES (?, ?)`;
+  db.run(sql, [userId, message], function (err) {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    res.status(201).json({ messageId: this.lastID });
+  });
+});
+
+// 管理员回复消息
+router.put('/messages/:id/reply', authenticateToken, (req, res) => {
+  const { admin_reply } = req.body;
+  const messageId = req.params.id;
+
+  if (!admin_reply) {
+    return res.status(400).json({ error: "Reply cannot be empty" });
+  }
+
+  const sql = `UPDATE Messages SET admin_reply = ? WHERE id = ?`;
+  db.run(sql, [admin_reply, messageId], function (err) {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    res.json({ changes: this.changes });
+  });
+});
+
+
+router.get('/admin/messages', authenticateToken, (req, res) => {
+  
+  const sql = `
+    SELECT Messages.*, Users.username 
+    FROM Messages 
+    ORDER BY Messages.created_at DESC`;
+
+  db.all(sql, [], (err, rows) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    res.json(rows);
   });
 });
 module.exports = router;
