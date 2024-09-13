@@ -71,7 +71,8 @@ router.get('/protected', authenticateToken, function(req, res, next) {
 function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
-
+  console.log(authHeader);
+  
   if (token == null) return res.sendStatus(401);
 
   jwt.verify(token, JWT_SECRET, (err, user) => {
@@ -144,42 +145,48 @@ router.delete('/users/:id', function(req, res, next) {
 
 
 // =============================
-// Applications CRUD operations
+// Videos CRUD operations (Renamed from Applications)
 // =============================
 
-// Create a new application
-router.post('/applications', function(req, res, next) {
-  const { user_id, status, description, photo, video } = req.body;
-  const sql = `INSERT INTO Applications (user_id, status, description, photo, video) VALUES (?, ?, ?, ?, ?)`;
-  db.run(sql, [user_id, status, description, photo, video], function(err) {
+// Create a new video
+router.post('/videos', function(req, res, next) {
+  const { name, status, description, video } = req.body;
+  const sql = `INSERT INTO Videos (name, status, description, video) VALUES (?, ?, ?, ?)`;
+  db.run(sql, [name, status, description, video], function(err) {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
-    res.status(201).json({ applicationId: this.lastID });
+    res.status(201).json({ videoId: this.lastID });
   });
 });
 
-// Get all applications
-router.get('/applications', function(req, res, next) {
+// Get all videos
+router.get('/videos', function(req, res, next) {
   const { name, status, page = 1, pageSize = 5 } = req.query;
 
-  let sql = `SELECT * FROM Applications WHERE 1=1`; 
+  let sql = `SELECT * FROM Videos WHERE 1=1`; 
+  let countSql = `SELECT COUNT(*) as total FROM Videos WHERE 1=1`;
+  
   const params = [];
+  const countParams = [];
 
+  // 为 name 添加筛选条件
   if (name) {
     sql += ` AND name LIKE ?`;
+    countSql += ` AND name LIKE ?`;
     params.push(`%${name}%`);
+    countParams.push(`%${name}%`);
   }
 
+  // 为 status 添加筛选条件
   if (status) {
     sql += ` AND status = ?`;
+    countSql += ` AND status = ?`;
     params.push(status);
+    countParams.push(status);
   }
 
-  const countSql = `SELECT COUNT(*) as total FROM Applications WHERE 1=1`;
-  let totalParams = [...params];
-
-  db.get(countSql, totalParams, (err, countRow) => {
+  db.get(countSql, countParams, (err, countRow) => {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
@@ -198,12 +205,10 @@ router.get('/applications', function(req, res, next) {
 });
 
 
-
-
-// Get a specific application by ID
-router.get('/applications/:id', function(req, res, next) {
+// Get a specific video by ID
+router.get('/videos/:id', function(req, res, next) {
   const { id } = req.params;
-  db.get(`SELECT * FROM Applications WHERE id = ?`, [id], (err, row) => {
+  db.get(`SELECT * FROM Videos WHERE id = ?`, [id], (err, row) => {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
@@ -211,12 +216,12 @@ router.get('/applications/:id', function(req, res, next) {
   });
 });
 
-// Update an application by ID
-router.put('/applications/:id', function(req, res, next) {
+// Update a video by ID
+router.put('/videos/:id', function(req, res, next) {
   const { id } = req.params;
-  const { status, description, photo, video } = req.body;
-  const sql = `UPDATE Applications SET status = ?, description = ?, photo = ?, video = ? WHERE id = ?`;
-  db.run(sql, [status, description, photo, video, id], function(err) {
+  const { status, description, video } = req.body;
+  const sql = `UPDATE Videos SET status = ?, description = ?, video = ? WHERE id = ?`;
+  db.run(sql, [status, description, video, id], function(err) {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
@@ -224,10 +229,10 @@ router.put('/applications/:id', function(req, res, next) {
   });
 });
 
-// Delete an application by ID
-router.delete('/applications/:id', function(req, res, next) {
+// Delete a video by ID
+router.delete('/videos/:id', function(req, res, next) {
   const { id } = req.params;
-  db.run(`DELETE FROM Applications WHERE id = ?`, [id], function(err) {
+  db.run(`DELETE FROM Videos WHERE id = ?`, [id], function(err) {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
@@ -242,9 +247,9 @@ router.delete('/applications/:id', function(req, res, next) {
 
 // Create a new message
 router.post('/messages', function(req, res, next) {
-  const { user_id, application_id, message } = req.body;
-  const sql = `INSERT INTO Messages (user_id, application_id, message) VALUES (?, ?, ?)`;
-  db.run(sql, [user_id, application_id, message], function(err) {
+  const { user_id, video_id, message } = req.body; // Updated to reference video_id
+  const sql = `INSERT INTO Messages (user_id, video_id, message) VALUES (?, ?, ?)`;
+  db.run(sql, [user_id, video_id, message], function(err) {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
@@ -297,4 +302,122 @@ router.delete('/messages/:id', function(req, res, next) {
   });
 });
 
+
+router.post('/applications', authenticateToken, function(req, res, next) {
+  const { item, description } = req.body;
+  const userId = req.user.userId; 
+
+  const sql = `INSERT INTO Applications (user_id, item, description) VALUES (?, ?, ?)`;
+  db.run(sql, [userId, item, description], function(err) {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    res.status(201).json({ applicationId: this.lastID });
+  });
+});
+
+router.get('/applications', function(req, res, next) {
+  const sql = `SELECT * FROM Applications`;
+  db.all(sql, [], (err, rows) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    res.json(rows); // Returns all rental applications
+  });
+});
+
+router.put('/applications/:id/status', function(req, res, next) {
+  const { id } = req.params; // Application ID
+  const { status } = req.body; // New status: 'pending', 'accepted', 'rejected'
+
+  const sql = `UPDATE Applications SET status = ? WHERE id = ?`;
+  db.run(sql, [status, id], function(err) {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    res.json({ changes: this.changes });
+  });
+});
+
+router.get('/applications/:id', function(req, res, next) {
+  const { id } = req.params;
+  const sql = `SELECT * FROM Applications WHERE id = ?`;
+  db.get(sql, [id], (err, row) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    res.json(row);
+  });
+});
+
+
+// Create a new rental
+router.post('/rentals', authenticateToken, (req, res) => {
+  const { video_id, rental_date } = req.body;
+  const user_id = req.user.userId; 
+
+  const sql = `INSERT INTO Rentals (user_id, video_id, rental_date, status) VALUES (?, ?, ?, 'new')`;
+  db.run(sql, [user_id, video_id, rental_date], function(err) {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    res.status(201).json({ rentalId: this.lastID });
+  });
+});
+
+// Get all rentals
+router.get('/rentals', authenticateToken, (req, res) => {
+  const sql = `SELECT Rentals.*, Users.username, Videos.name AS video_name 
+               FROM Rentals 
+               JOIN Users ON Rentals.user_id = Users.id 
+               JOIN Videos ON Rentals.video_id = Videos.id`;
+  db.all(sql, [], (err, rows) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    res.json(rows);
+  });
+});
+
+// Get rental by ID
+router.get('/rentals/:id', authenticateToken, (req, res) => {
+  const { id } = req.params;
+  const sql = `SELECT Rentals.*, Users.username, Videos.name AS video_name 
+               FROM Rentals 
+               JOIN Users ON Rentals.user_id = Users.id 
+               JOIN Videos ON Rentals.video_id = Videos.id
+               WHERE Rentals.id = ?`;
+  db.get(sql, [id], (err, row) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    res.json(row);
+  });
+});
+
+// Update rental status
+router.put('/rentals/:id/status', authenticateToken, (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;  // 'new', 'pending', 'returned', 'cancelled'
+
+  const sql = `UPDATE Rentals SET status = ? WHERE id = ?`;
+  db.run(sql, [status, id], function(err) {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    res.json({ changes: this.changes });
+  });
+});
+
+// Delete rental
+router.delete('/rentals/:id', authenticateToken, (req, res) => {
+  const { id } = req.params;
+  const sql = `DELETE FROM Rentals WHERE id = ?`;
+  db.run(sql, [id], function(err) {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    res.status(204).end();
+  });
+});
 module.exports = router;
