@@ -14,6 +14,9 @@ var usersRouter = require('./routes/users');
 var app = express();
 app.use(cors());
 
+app.use('/uploads', express.static(path.join(__dirname, 'routes/uploads')));
+
+
 // view engine setup
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'jade');

@@ -37,7 +37,6 @@ router.post('/register', async function(req, res, next) {
 // =============================
 // User Login
 // =============================
-
 router.post('/login', function(req, res, next) {
   const { username, password } = req.body;
 
@@ -59,9 +58,11 @@ router.post('/login', function(req, res, next) {
     // Generate a JWT token
     const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '1h' });
 
-    res.json({ token });
+    // Return token and role
+    res.json({ token, role: user.role });
   });
 });
+
 
 router.get('/protected', authenticateToken, function(req, res, next) {
   res.json({ message: 'This is a protected route', user: req.user });
@@ -71,7 +72,6 @@ router.get('/protected', authenticateToken, function(req, res, next) {
 function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
-  console.log(authHeader);
   
   if (token == null) return res.sendStatus(401);
 
@@ -150,9 +150,9 @@ router.delete('/users/:id', function(req, res, next) {
 
 // Create a new video
 router.post('/videos', function(req, res, next) {
-  const { name, status, description, video } = req.body;
-  const sql = `INSERT INTO Videos (name, status, description, video) VALUES (?, ?, ?, ?)`;
-  db.run(sql, [name, status, description, video], function(err) {
+  const { name, description, video } = req.body;
+  const sql = `INSERT INTO Videos (name,status, description, video) VALUES (?, "NEW", ?, ?)`;
+  db.run(sql, [name,  description, video], function(err) {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
@@ -162,7 +162,7 @@ router.post('/videos', function(req, res, next) {
 
 // Get all videos
 router.get('/videos', function(req, res, next) {
-  const { name, status, page = 1, pageSize = 5 } = req.query;
+  const { name, status, page = 1, pageSize = -1 } = req.query;
 
   let sql = `SELECT * FROM Videos WHERE 1=1`; 
   let countSql = `SELECT COUNT(*) as total FROM Videos WHERE 1=1`;
@@ -361,6 +361,8 @@ router.post('/messages', authenticateToken, (req, res) => {
 router.put('/messages/:id/reply', authenticateToken, (req, res) => {
   const { admin_reply } = req.body;
   const messageId = req.params.id;
+  
+
 
   if (!admin_reply) {
     return res.status(400).json({ error: "Reply cannot be empty" });
@@ -375,12 +377,41 @@ router.put('/messages/:id/reply', authenticateToken, (req, res) => {
   });
 });
 
+const multer = require('multer');
+const path = require('path');
+
+
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, path.join(__dirname, 'uploads')); 
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + '-' + file.originalname); 
+  }
+});
+
+const upload = multer({ storage: storage });
+
+router.post('/upload', upload.single('file'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: "No file uploaded" });
+  }
+
+  const fileUrl = `/uploads/${req.file.filename}`;
+  res.json({ url: fileUrl });
+});
+
 
 router.get('/admin/messages', authenticateToken, (req, res) => {
   
+  let u = req.user
+  console.log(u);
+   
   const sql = `
-    SELECT Messages.*, Users.username 
+    SELECT Messages.*, Users.username
     FROM Messages 
+     JOIN Users ON Messages.user_id = Users.id
     ORDER BY Messages.created_at DESC`;
 
   db.all(sql, [], (err, rows) => {
